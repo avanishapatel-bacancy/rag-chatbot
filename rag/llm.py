@@ -13,6 +13,25 @@ _MAX_STREAM_RETRIES = 3
 
 NOT_FOUND_PHRASE = "i couldn't find this in the uploaded documents"
 
+# Rewriting a follow-up into a standalone question is a small, simple task -
+# always use the fastest model for it, regardless of which (possibly
+# heavier) model the user picked for the actual answer, so this extra
+# round-trip adds as little latency as possible.
+CONDENSE_MODEL = "models/gemini-flash-lite-latest"
+
+_clients: dict[str, genai.Client] = {}
+
+
+def _get_client(api_key: str) -> genai.Client:
+    """A fresh genai.Client() sets up its own HTTP transport, which used to
+    happen on every single condense/answer call - reusing one per API key
+    (stable for the life of a session) cuts that overhead from every turn."""
+    client = _clients.get(api_key)
+    if client is None:
+        client = genai.Client(api_key=api_key)
+        _clients[api_key] = client
+    return client
+
 SYSTEM_PROMPT = f"""You are a precise, helpful assistant that answers questions using ONLY \
 the numbered CONTEXT excerpts below, which come from documents the user uploaded.
 
@@ -68,13 +87,13 @@ def _needs_condensing(question: str) -> bool:
     return any(w in _REFERENTIAL_WORDS for w in words)
 
 
-def condense_question(question: str, history: list[dict], api_key: str, model_name: str) -> str:
+def condense_question(question: str, history: list[dict], api_key: str) -> str:
     if not history or not _needs_condensing(question):
         return question
-    client = genai.Client(api_key=api_key)
+    client = _get_client(api_key)
     prompt = CONDENSE_PROMPT.format(history=_format_history(history), question=question)
     try:
-        response = client.models.generate_content(model=model_name, contents=prompt)
+        response = client.models.generate_content(model=CONDENSE_MODEL, contents=prompt)
         rewritten = (response.text or "").strip()
         return rewritten or question
     except Exception:
@@ -104,7 +123,7 @@ def stream_answer(
     caller yet -- once partial text has been shown, a retry could duplicate
     it, so at that point the error is simply raised.
     """
-    client = genai.Client(api_key=api_key)
+    client = _get_client(api_key)
     context_block = build_context_block(scored_chunks) if scored_chunks else "(no relevant context found)"
 
     convo = []

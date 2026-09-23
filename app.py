@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 import time
 
+import numpy as np
 import streamlit as st
 
 from rag.chunking import chunk_documents
@@ -317,26 +318,42 @@ with st.sidebar:
             ]
             if not new_files:
                 st.info("All uploaded files are already processed.")
-            for f in new_files:
-                try:
-                    with st.spinner(f"Parsing {f.name}..."):
-                        sections = parse_document(f.name, f.getvalue())
-                        chunks = chunk_documents({f.name: sections})
-                    if not chunks:
-                        st.warning(f"No extractable text found in {f.name}.")
-                        continue
-                    progress = st.progress(0.0, text=f"Embedding {f.name}...")
+            else:
+                # Chunks/vectors from every file in this batch are collected
+                # here and added to the store in a single call below -
+                # HybridVectorStore.add() rebuilds its whole BM25 index from
+                # scratch on every call, so adding per-file would rebuild it
+                # once per file over an ever-growing corpus instead of once.
+                batch_chunks = []
+                batch_vectors = []
+                indexed = []
+                for f in new_files:
+                    try:
+                        with st.spinner(f"Parsing {f.name}..."):
+                            sections = parse_document(f.name, f.getvalue())
+                        with st.spinner(f"Chunking {f.name}..."):
+                            chunks = chunk_documents({f.name: sections})
+                        if not chunks:
+                            st.warning(f"No extractable text found in {f.name}.")
+                            continue
+                        progress = st.progress(0.0, text=f"Embedding {f.name}...")
 
-                    def _cb(done, total):
-                        progress.progress(done / total, text=f"Embedding {f.name}... ({done}/{total})")
+                        def _cb(done, total):
+                            progress.progress(done / total, text=f"Embedding {f.name}... ({done}/{total})")
 
-                    vectors = embed_documents([c.text for c in chunks], progress_cb=_cb)
-                    st.session_state.store.add(chunks, vectors)
-                    st.session_state.processed_signatures.add((f.name, f.size))
-                    progress.empty()
-                    st.success(f"Indexed {f.name} ({len(chunks)} chunks).")
-                except Exception as exc:
-                    st.error(f"Failed to process {f.name}: {exc}")
+                        vectors = embed_documents([c.text for c in chunks], progress_cb=_cb)
+                        progress.empty()
+                        batch_chunks.extend(chunks)
+                        batch_vectors.append(vectors)
+                        st.session_state.processed_signatures.add((f.name, f.size))
+                        indexed.append((f.name, len(chunks)))
+                    except Exception as exc:
+                        st.error(f"Failed to process {f.name}: {exc}")
+
+                if batch_chunks:
+                    st.session_state.store.add(batch_chunks, np.vstack(batch_vectors))
+                    for name, n in indexed:
+                        st.success(f"Indexed {name} ({n} chunks).")
 
     store: HybridVectorStore = st.session_state.store
     if store.sources:
@@ -436,9 +453,11 @@ def generate_reply(question: str, history: list[dict]) -> dict:
     placeholder = st.empty()
     placeholder.markdown("🔎 _Searching your documents…_")
     try:
-        standalone_q = condense_question(question, history, api_key, model_name)
-        q_vector = embed_query(standalone_q)
-        scored = st.session_state.store.search(q_vector, standalone_q, top_k=top_k, alpha=alpha)
+        standalone_q = condense_question(question, history, api_key)
+        store: HybridVectorStore = st.session_state.store
+        if store.chunks:
+            q_vector = embed_query(standalone_q)
+            scored = store.search(q_vector, standalone_q, top_k=top_k, alpha=alpha)
         placeholder.markdown("✍️ _Writing answer…_")
         for delta in stream_answer(standalone_q, scored, history, api_key, model_name, temperature):
             full_text += delta
