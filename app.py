@@ -1,4 +1,4 @@
-"""DocuMind - a free, end-to-end RAG chatbot.
+"""DocuMind - AI Document Assistant - a free, end-to-end RAG chatbot.
 
 Upload documents -> parse -> chunk -> embed (local, free) -> hybrid retrieve
 -> grounded, cited, streamed answers (Gemini). Every visitor's documents
@@ -24,7 +24,7 @@ BOT_AVATAR = "🧠"
 USER_AVATAR = "🙂"
 FILE_ICONS = {"pdf": "📕", "docx": "📘", "txt": "📄", "md": "📝", "markdown": "📝"}
 
-st.set_page_config(page_title="DocuMind - RAG Chatbot", page_icon="🧠", layout="wide")
+st.set_page_config(page_title="DocuMind - AI Document Assistant", page_icon="🧠", layout="wide")
 
 # ------------------------------------------------------------- theme setup --
 # A single, fixed "Aurora" theme: a bright, airy canvas with an indigo ->
@@ -108,6 +108,7 @@ width: 3rem; height: 3rem; border-radius: 12px; flex-shrink: 0;
 background: rgba(255, 255, 255, 0.16); font-size: 1.6rem;
 }}
 .documind-hero h1 {{ margin: 0; font-size: 1.55rem; font-weight: 800; color: #fff; letter-spacing: -.01em; }}
+.documind-hero .hero-subtitle {{ margin: .1rem 0 0; opacity: .85; font-size: .78rem; font-weight: 600; color: #fff; text-transform: uppercase; letter-spacing: .04em; }}
 .documind-hero p {{ margin: .3rem 0 0; opacity: .94; font-size: .92rem; color: #fff; }}
 
 .status-line {{
@@ -260,6 +261,7 @@ st.markdown(
     '<div class="hero-icon">🧠</div>'
     "<div>"
     "<h1>DocuMind</h1>"
+    '<p class="hero-subtitle">AI Document Assistant</p>'
     "<p>Ask questions about your documents and get grounded, cited answers. "
     "Your documents stay private to this browser session.</p>"
     "</div>"
@@ -517,7 +519,7 @@ if not st.session_state.messages:
 
 question = st.chat_input("Ask a question about your documents...")
 st.markdown(
-    '<p class="disclaimer">DocuMind can make mistakes. Double-check important information '
+    '<p class="disclaimer">DocuMind - AI Document Assistant can make mistakes. Double-check important information '
     "against your source documents.</p>",
     unsafe_allow_html=True,
 )

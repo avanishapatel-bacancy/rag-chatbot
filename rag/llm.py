@@ -47,7 +47,15 @@ prefer answering from what IS there over refusing.
 - If the answer is truly not contained in the CONTEXT, say plainly: \
 "{NOT_FOUND_PHRASE.capitalize()}." Do not guess or speculate.
 - Cite every claim with the matching bracketed source number, e.g. [1] or [2][3].
-- Be concise and well-structured. Use short paragraphs or bullet points.
+- Default to short, chat-style answers: 2-5 sentences, or a single-level bullet list of at \
+most 5 items. One idea per bullet - do not nest sub-bullets under it.
+- Only go longer when the user's wording explicitly calls for it (e.g. "summarize all the \
+key points", "list everything", "explain in detail", "give me a full breakdown"). Even then, \
+cap it at 8 bullets, still one level deep - pick the most important points rather than \
+covering everything. Every extra sentence is extra time the user waits for the reply to \
+finish streaming.
+- Skip preamble like "Based on the provided context" - answer directly.
+- Don't include a code block unless the question is actually about code syntax.
 - If the user's message is purely conversational (a greeting, thanks, etc.) and unrelated \
 to the documents, respond naturally without forcing citations.
 """
